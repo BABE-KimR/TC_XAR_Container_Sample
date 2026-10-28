@@ -19,6 +19,7 @@ Run on the Linux host from the repo root (usually with `sudo`):
 - `tc31-xar-base/Dockerfile`: `debian:trixie-slim`; fetches the Beckhoff signing key and replaces Debian apt sources with `deb.beckhoff.com` (via `bhf.list` and `debian.sources.list` from the `apt-config` named build context), authenticated with the secret `apt` netrc file (`bhf.conf`); installs `tc31-xar-um` and `adstool`; copies `TwinCAT/StaticRoutes.xml` and `SysStartupState.reg` into `/etc/TwinCAT/3.1/Target/`.
 - `entrypoint.sh` execs `TcSystemServiceUm` with `-i "${AMS_NETID}"` (set in compose, default `15.15.15.15.1.1`).
 - ADS-over-MQTT: the container's `StaticRoutes.xml` connects to broker host `mosquitto` (topic `AdsOverMqtt`). `tc31-xar-base/mqtt.xml` is a **template for the Windows engineering PC** (copied to `C:\Program Files (x86)\Beckhoff\TwinCAT\3.1\Target\Routes\`); its `ip-address-of-container-host` placeholder must be replaced with the IPC's IP.
+- Samples: `tc31-xar-base` (runtime + Mosquitto) and `tf2000-hmi-server` (**NOT WORKING**, work in progress; TF2000 HMI server; standalone Dockerfile, joins the external `container-network` at 192.168.20.4, ADS via the `mosquitto` broker, AMS Net ID `15.15.15.17.1.1`, HTTPS port 2020 published, local HTTP endpoint 2010 not published). Samples share the network `container-network` (192.168.20.0/24); pick unique IPs and AMS Net IDs. `PRE_UP` in a sample Makefile creates the shared network before `compose up`.
 - Real-time Ethernet: NICs bound to `vfio-pci` on the host (`TcRteInstall`); `PCI_DEVICES` env var in compose (unset = probe all, `NONE`, or space-separated PCI addresses) controls which are used.
 
 ## Conventions
@@ -28,4 +29,5 @@ Run on the Linux host from the repo root (usually with `sudo`):
 - Keep `mk/common.mk` targets, the root Makefile `TARGETS` list, the `help` text, and the README "Additional Commands" list in sync.
 - The root `README.md` is the guide for `tc31-xar-base` only; leave it as is. Every new sample gets its own `README.md` in its folder with sample-specific explanation and instructions. Touch the root README only to add a short description of the new sample and a link to the sample's README.
 - Don't hard-code the repository name (e.g. `TC_XAR_Container_Sample` / `tc_xar_container_sample`) in docs, scripts, or config; use placeholders like `<repository-url>`, relative paths, or the pinned per-sample Compose `name:`.
+- Run-time secrets live in `apt-config.private/*.env` (template: `apt-config/hmi.env`), referenced by `ENV_FILE` in a sample Makefile and interpolated in compose via `${VAR:?message}`; never put secrets in compose files, images or committed files.
 - `entrypoint.sh` carries an SPDX header (Zero-Clause BSD); keep it POSIX `sh`.

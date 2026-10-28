@@ -1,0 +1,40 @@
+name: tf2000-hmi-server
+
+# Shares container-network with the other TwinCAT containers (tc31-xar-base, mosquitto).
+# The network is created by `make run-containers` / `make deploy-containers` if it does not exist yet.
+networks:
+  container-network:
+    name: container-network
+    external: true
+
+services:
+  tf2000-hmi-server:
+    image: tf2000-hmi-server:latest
+    container_name: tf2000-hmi-server
+    hostname: tf2000-hmi-server
+    restart: unless-stopped
+    ports:
+      # Only the HTTPS port is published; the HTTP endpoint on 2010 stays local to the container
+      - "2020:2020"
+    healthcheck:
+      test: ["CMD-SHELL", "curl --silent --output /dev/null http://127.0.0.1:2010/ || exit 1"]
+      start_period: 30s
+      interval: 15s
+      timeout: 5s
+      retries: 3
+    volumes:
+      # Server instance created by TcHmiSrv --initialize (server >= 14.5.73)
+      - hmi-server-data:/var/lib/tchmisrv
+    networks:
+      container-network:
+        ipv4_address: 192.168.20.4
+    environment:
+      # AMS Net ID of this container; must be unique among all TwinCAT containers
+      - AMS_NETID=15.15.15.17.1.1
+      # Password for `TcHmiSrv --initialize`, read from apt-config.private/hmi.env (see README)
+      - HMI_PASSWORD=${HMI_PASSWORD:?set HMI_PASSWORD in apt-config.private/hmi.env}
+      # Further arguments for `TcHmiSrv --initialize`, run once on first start (see README)
+      - HMI_INIT_ARGS=--endpoint=http://127.0.0.1:2010
+
+volumes:
+  hmi-server-data:

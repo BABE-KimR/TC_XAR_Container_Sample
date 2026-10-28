@@ -21,6 +21,14 @@ BUILD_CONTEXT ?= .
 EXTRA_BUILD_ARGS ?=
 # Files copied to the target by deploy-containers (relative to the sample folder)
 DEPLOY_FILES ?= docker-compose.yaml
+# Optional shell command run before `docker compose up` (e.g. to create a shared network)
+PRE_UP ?=
+# Optional env file with run-time secrets for docker compose (kept in apt-config.private, never committed)
+ENV_FILE ?=
+COMPOSE = docker compose $(if $(ENV_FILE),--env-file "$(ENV_FILE)")
+# Optional hint printed after the containers were started: one line per \n, no single quotes or %
+POST_UP_MSG ?=
+POST_UP = $(if $(POST_UP_MSG),@printf '\n$(POST_UP_MSG)\n')
 
 # Optional remote target definition (see apt-config/target.conf)
 -include $(APT_CONFIG_DIR)/target.conf
@@ -36,7 +44,10 @@ BUILD_CMD = docker build --no-cache --secret id=apt,src=$(APT_AUTH_CONF) --build
 WITH_KEY = $(if $(TARGET_SSH_KEY),ssh-agent sh -c 'ssh-add "$(TARGET_SSH_KEY)" && $(1)',$(1))
 
 .DEFAULT_GOAL := help
-.PHONY: build-image push-image run-containers restart-containers list-containers stop-and-remove-containers container-logs check-apt-config check-target build-image-remote deploy-containers remote-container-logs remote-stop-containers help
+.PHONY: build-image push-image run-containers restart-containers list-containers stop-and-remove-containers container-logs check-apt-config check-target check-env build-image-remote deploy-containers remote-container-logs remote-stop-containers help
+
+check-env:
+	@test -z "$(ENV_FILE)" || test -f "$(ENV_FILE)" || { echo "Missing $(ENV_FILE). Copy it from $(REPO_ROOT)/apt-config/$(notdir $(ENV_FILE)) and edit it."; exit 1; }
 
 check-apt-config:
 	@test -f "$(APT_AUTH_CONF)" || { echo "Missing $(APT_AUTH_CONF). Run: cp -r $(REPO_ROOT)/apt-config $(APT_CONFIG_DIR) and add your myBeckhoff credentials."; exit 1; }
@@ -55,11 +66,13 @@ build-image-remote: check-apt-config check-target
 	$(call WITH_KEY,DOCKER_HOST=$(REMOTE_DOCKER_HOST) $(BUILD_CMD))
 
 # Copies the compose files to the target and starts the containers there
-deploy-containers: check-target
+deploy-containers: check-target check-env
 	@echo "Deploying to $(TARGET_USER)@$(TARGET_HOST):$(REMOTE_DIR)"
-	$(SSH) "mkdir -p '$(REMOTE_DIR)'"
+	$(SSH) "$(if $(PRE_UP),$(PRE_UP) && )mkdir -p '$(REMOTE_DIR)'"
 	$(SCP) $(DEPLOY_FILES) $(TARGET_USER)@$(TARGET_HOST):'$(REMOTE_DIR)/'
+	$(if $(ENV_FILE),$(SCP) "$(ENV_FILE)" $(TARGET_USER)@$(TARGET_HOST):'$(REMOTE_DIR)/.env' && $(SSH) "chmod 600 '$(REMOTE_DIR)/.env'")
 	$(SSH) "cd '$(REMOTE_DIR)' && docker compose up -d"
+	$(call POST_UP)
 
 remote-container-logs: check-target
 	$(SSH) "cd '$(REMOTE_DIR)' && docker compose logs -f"
@@ -71,26 +84,30 @@ push-image:
 	@echo "Pushing Docker image: $(IMAGE)"
 	docker push $(IMAGE)
 
-run-containers:
+run-containers: check-env
 	@echo "Starting containers..."
-	docker compose up -d
+	$(PRE_UP)
+	$(COMPOSE) up -d
+	$(call POST_UP)
 
-restart-containers:
+restart-containers: check-env
 	@echo "Restarting containers..."
-	docker compose down
-	docker compose up -d
+	$(COMPOSE) down
+	$(PRE_UP)
+	$(COMPOSE) up -d
+	$(call POST_UP)
 
 list-containers:
 	@echo "Listing containers..."
-	docker compose ps -a
+	$(COMPOSE) ps -a
 
 stop-and-remove-containers:
 	@echo "Stopping and removing containers..."
-	docker compose down
+	$(COMPOSE) down
 
 container-logs:
 	@echo "Showing container logs..."
-	docker compose logs -ft
+	$(COMPOSE) logs -ft
 
 help:
 	@echo "Available targets:"

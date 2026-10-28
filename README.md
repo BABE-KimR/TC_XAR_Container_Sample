@@ -16,6 +16,12 @@ Here’s a high-level overview of what the completed setup will look like:
 
 ---
 
+## **Other samples**
+
+- [`tf2000-hmi-server`](tf2000-hmi-server/README.md) — **NOT WORKING (work in progress):** TwinCAT 3 HMI Server (TF2000) container that shares the container network with the TwinCAT runtime and can be deployed independently.
+
+---
+
 ## **How to get support**
 
 Should you have any questions regarding the provided sample code, please contact your local Beckhoff support team. Contact information can be found on the official Beckhoff website at https://www.beckhoff.com/contact/.

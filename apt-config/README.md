@@ -19,6 +19,7 @@ Files:
 - `bhf.conf` — apt/curl netrc credentials for `deb.beckhoff.com` and `deb-mirror.beckhoff.com`
 - `bhf.list` — Beckhoff apt source
 - `debian.sources.list` — Debian mirror sources served by Beckhoff
+- `hmi.env` — run-time secrets for samples (currently `HMI_PASSWORD` for `tf2000-hmi-server`); passed to Docker Compose via `ENV_FILE` in the sample Makefile and copied to the target as `.env` by `deploy-containers`.
 - `target.conf` — optional definition of a remote Beckhoff IPC (`TARGET_HOST`, `TARGET_USER`, `TARGET_PORT`, `TARGET_SSH_KEY`, `TARGET_DIR`) used by the remote build/deploy targets (`make build-image-remote`, `make deploy-containers`). Edit it in `apt-config.private` only.
 
 ## Remote build and deploy

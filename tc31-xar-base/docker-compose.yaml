@@ -1,3 +1,5 @@
+name: tc31-xar-base
+
 networks:
   container-network:
     name: container-network

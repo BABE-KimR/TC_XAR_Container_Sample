@@ -60,8 +60,8 @@ Work in the Linux filesystem (for example `~`), **not** under `/mnt/c`. This is 
 
 ```bash
 cd ~
-git clone https://github.com/BABE-KimR/TC_XAR_Container_Sample.git
-cd TC_XAR_Container_Sample
+git clone <repository-url>
+cd <repository-folder>
 ```
 
 ## 5. Create the private apt configuration

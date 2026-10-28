@@ -15,7 +15,7 @@ Run on the Linux host from the repo root (usually with `sudo`):
 
 ## Architecture
 
-- `tc31-xar-base/docker-compose.yaml` defines a fixed network `container-network` (192.168.20.0/24) with two services: `mosquitto` (192.168.20.2, port 1883, config `simple-mosquitto.conf`, anonymous) and `tc31-xar-base` (192.168.20.3, `privileged: true`, mounts `/dev/hugepages`). The runtime image is **not pulled**; it must be built locally first.
+- `tc31-xar-base/docker-compose.yaml` pins the Compose project name (`name: tc31-xar-base`) so it doesn't depend on the folder or `-f` path; keep this in every sample's compose file. It defines a fixed network `container-network` (192.168.20.0/24) with two services: `mosquitto` (192.168.20.2, port 1883, config `simple-mosquitto.conf`, anonymous) and `tc31-xar-base` (192.168.20.3, `privileged: true`, mounts `/dev/hugepages`). The runtime image is **not pulled**; it must be built locally first.
 - `tc31-xar-base/Dockerfile`: `debian:trixie-slim`; fetches the Beckhoff signing key and replaces Debian apt sources with `deb.beckhoff.com` (via `bhf.list` and `debian.sources.list` from the `apt-config` named build context), authenticated with the secret `apt` netrc file (`bhf.conf`); installs `tc31-xar-um` and `adstool`; copies `TwinCAT/StaticRoutes.xml` and `SysStartupState.reg` into `/etc/TwinCAT/3.1/Target/`.
 - `entrypoint.sh` execs `TcSystemServiceUm` with `-i "${AMS_NETID}"` (set in compose, default `15.15.15.15.1.1`).
 - ADS-over-MQTT: the container's `StaticRoutes.xml` connects to broker host `mosquitto` (topic `AdsOverMqtt`). `tc31-xar-base/mqtt.xml` is a **template for the Windows engineering PC** (copied to `C:\Program Files (x86)\Beckhoff\TwinCAT\3.1\Target\Routes\`); its `ip-address-of-container-host` placeholder must be replaced with the IPC's IP.
@@ -26,4 +26,6 @@ Run on the Linux host from the repo root (usually with `sudo`):
 - `apt-config/` (repo root) is the template shared by all samples: it may only contain the placeholder template data (`<mybeckhoff-mail>` / `<mybeckhoff-password>`). Real credentials go only in the gitignored `apt-config.private/`, which every sample must use for building containers.
 - If the AMS Net ID, broker name/IP, or port 1883 changes, keep `docker-compose.yaml`, `StaticRoutes.xml`, `mqtt.xml`, and the README (firewall/nftables step, target Net ID) consistent.
 - Keep `mk/common.mk` targets, the root Makefile `TARGETS` list, the `help` text, and the README "Additional Commands" list in sync.
+- The root `README.md` is the guide for `tc31-xar-base` only; leave it as is. Every new sample gets its own `README.md` in its folder with sample-specific explanation and instructions. Touch the root README only to add a short description of the new sample and a link to the sample's README.
+- Don't hard-code the repository name (e.g. `TC_XAR_Container_Sample` / `tc_xar_container_sample`) in docs, scripts, or config; use placeholders like `<repository-url>`, relative paths, or the pinned per-sample Compose `name:`.
 - `entrypoint.sh` carries an SPDX header (Zero-Clause BSD); keep it POSIX `sh`.

@@ -6,7 +6,8 @@ IMAGE_TAG ?= latest
 
 IMAGE = $(REGISTRY)$(IMAGE_OWNER)$(IMAGE_NAME):$(IMAGE_TAG)
 
-APT_AUTH_CONF ?= ./tc31-xar-base/apt-config/bhf.conf
+APT_CONFIG_DIR ?= ./apt-config.private
+APT_AUTH_CONF ?= $(APT_CONFIG_DIR)/bhf.conf
 DOCKERFILE ?= ./tc31-xar-base/Dockerfile
 BUILD_CONTEXT ?= ./tc31-xar-base
 
@@ -14,7 +15,7 @@ BUILD_CONTEXT ?= ./tc31-xar-base
 
 build-image:
 	@echo "Building Docker image: $(IMAGE)"
-	docker build --no-cache --secret id=apt,src=$(APT_AUTH_CONF) --network host -t $(IMAGE) -f $(DOCKERFILE) $(BUILD_CONTEXT)
+	docker build --no-cache --secret id=apt,src=$(APT_AUTH_CONF) --build-context apt-config=$(APT_CONFIG_DIR) --network host -t $(IMAGE) -f $(DOCKERFILE) $(BUILD_CONTEXT)
 
 push-image:
 	@echo "Pushing Docker image: $(IMAGE)"

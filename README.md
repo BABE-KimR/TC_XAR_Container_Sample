@@ -53,13 +53,14 @@ Once the prerequisites are in place, you can follow these steps to build and dep
 
 During the image build process, TwinCAT for Linux® will be downloaded from `https://deb.beckhoff.com`.
 
-   a. Edit `./tc31-xar-base/apt-config/bhf.conf` and replace `<mybeckhoff-mail>` and `<mybeckhoff-password>` with your valid myBeckhoff credentials:
+   a. The `./apt-config` folder is a shared template for all samples and must only ever contain the template data. Do not edit it. Instead, create a private copy named `apt-config.private` (already listed in `.gitignore`) and put your valid myBeckhoff credentials there, replacing `<mybeckhoff-mail>` and `<mybeckhoff-password>`:
 
    ```bash
-   nano ./tc31-xar-base/apt-config/bhf.conf
+   cp -r ./apt-config ./apt-config.private
+   nano ./apt-config.private/bhf.conf
    ```
 
-   Do not commit this file with real credentials.
+   All samples use `apt-config.private` when building a container image. Never commit real credentials.
 
    b. Build the Docker image. You can use the Makefile wrapper (recommended) or the direct docker command:
 
@@ -71,7 +72,7 @@ During the image build process, TwinCAT for Linux® will be downloaded from `htt
    **Option B: Using docker directly**
    ```bash
    cd tc31-xar-base
-   sudo docker build --secret id=apt,src=./apt-config/bhf.conf --network host -t tc31-xar-base .
+   sudo docker build --secret id=apt,src=../apt-config.private/bhf.conf --build-context apt-config=../apt-config.private --network host -t tc31-xar-base .
    cd ..  # Return to repository root for subsequent steps
    ```
 

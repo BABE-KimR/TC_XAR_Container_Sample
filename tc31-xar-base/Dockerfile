@@ -16,7 +16,8 @@ RUN --mount=type=secret,id=apt \
 # Replace default debian.org package sources.
 # From here on, all packages will be loaded from deb*.beckhoff.com
 RUN rm /etc/apt/sources.list.d/debian.sources
-COPY ./apt-config/bhf.list ./apt-config/debian.sources.list /etc/apt/sources.list.d/
+# "apt-config" is a named build context pointing to ./apt-config.private (see README)
+COPY --from=apt-config bhf.list debian.sources.list /etc/apt/sources.list.d/
 
 # Install TwinCAT runtime package
 RUN --mount=type=secret,id=apt \

@@ -76,6 +76,8 @@ During the image build process, TwinCAT for Linux® will be downloaded from `htt
    cd ..  # Return to repository root for subsequent steps
    ```
 
+   To build on a Windows PC instead, see [Building the container images on Windows with WSL2](docs/windows-wsl2-build.md).
+
    c. Verify the image was built successfully:
    ```bash
    sudo docker images
@@ -130,12 +132,12 @@ sudo systemctl restart docker
 
 ## **3. Start the containers**
 
-The sample includes a `docker-compose.yaml` file to simplify the process of creating a container network and starting the MQTT broker as well as the TwinCAT runtime container.
+The sample includes a `tc31-xar-base/docker-compose.yaml` file to simplify the process of creating a container network and starting the MQTT broker as well as the TwinCAT runtime container.
 
 From the repository root directory, start the containers:
 
 ```bash
-sudo docker compose up -d
+sudo docker compose -f tc31-xar-base/docker-compose.yaml up -d
 ```
 
 Or using the Makefile:
@@ -147,18 +149,18 @@ sudo make run-containers
 Verify the containers are running:
 
 ```bash
-sudo docker compose ps
+sudo docker compose -f tc31-xar-base/docker-compose.yaml ps
 # Or: sudo make list-containers
 ```
 
 You should see both `mosquitto` and `tc31-xar-base` containers with status "Up". Check the logs if any container is not running:
 
 ```bash
-sudo docker compose logs
+sudo docker compose -f tc31-xar-base/docker-compose.yaml logs
 # Or: sudo make container-logs
 ```
 
-If `sudo docker compose up -d` reports `pull access denied for tc31-xar-base`, go back to Step 1 and confirm that the local image `tc31-xar-base:latest` was built successfully. The Compose file expects that image to exist locally before the sample is started.
+If starting the containers reports `pull access denied for tc31-xar-base`, go back to Step 1 and confirm that the local image `tc31-xar-base:latest` was built successfully. The Compose file expects that image to exist locally before the sample is started.
 
 At this point, the Linux-host side of the sample is ready. The remaining ADS-over-MQTT setup moves to the Windows engineering PC, except for the quick host-IP lookup in step 4(a).
 
@@ -172,7 +174,7 @@ To connect your TwinCAT Engineering system (running on Windows) via ADS-over-MQT
    ```
    In the output, look for the network interface that your Windows engineering PC can reach. Use its IPv4 address from the `inet` column when updating `mqtt.xml`. If the Beckhoff IPC has multiple network interfaces, choose the one that is connected to the same network as your Windows engineering PC.
 
-   b. On your **Windows engineering PC**, edit the `mqtt.xml` template from this repository. Replace `ip-address-of-container-host` with the IP address from step (a) — this is the IP address of your Beckhoff IPC running Beckhoff RT Linux and Docker.
+   b. On your **Windows engineering PC**, edit the `tc31-xar-base/mqtt.xml` template from this repository. Replace `ip-address-of-container-host` with the IP address from step (a) — this is the IP address of your Beckhoff IPC running Beckhoff RT Linux and Docker.
 
    c. Copy the edited `mqtt.xml` file to:
    ```
@@ -232,19 +234,21 @@ Real-time Ethernet communication requires the `vfio-pci` driver for a PCI-based 
    Or using docker compose directly:
 
    ```bash
-   sudo docker compose restart tc31-xar-base
+   sudo docker compose -f tc31-xar-base/docker-compose.yaml restart tc31-xar-base
    ```
 
-**Advanced:** By default, the container will probe all available PCI network devices bound to `vfio-pci`. You can control this behavior by setting the `PCI_DEVICES` environment variable in `docker-compose.yaml`. See the comments above the `environment:` section in that file for details on setting `PCI_DEVICES` to `NONE` or an explicit list of PCI addresses.
+**Advanced:** By default, the container will probe all available PCI network devices bound to `vfio-pci`. You can control this behavior by setting the `PCI_DEVICES` environment variable in `tc31-xar-base/docker-compose.yaml`. See the comments above the `environment:` section in that file for details on setting `PCI_DEVICES` to `NONE` or an explicit list of PCI addresses.
 
 ---
 
 ## Additional Commands
 
-This repository includes a `Makefile` with shortcuts for common Docker operations. Run `make help` to see all available targets:
+Each sample folder has its own `Makefile` (built on the shared `mk/common.mk`) with shortcuts for common Docker operations. The root `Makefile` delegates to a sample selected with `SAMPLE=<folder>` (default `tc31-xar-base`). Run `make help` to see the usage, or `make -C <sample> help` for a sample's targets:
 
 ```bash
 make help
+make list-samples
+sudo make SAMPLE=tc31-xar-base build-image   # same as: sudo make -C tc31-xar-base build-image
 ```
 
 Available targets:
@@ -255,6 +259,11 @@ Available targets:
 - `list-containers` — List all containers managed by Docker Compose
 - `stop-and-remove-containers` — Stop and remove containers
 - `container-logs` — Show logs for all containers
+- `build-image-remote` — Build the image on the target defined in `apt-config.private/target.conf` (over SSH)
+- `deploy-containers` — Copy the sample's compose files to the target and start the containers there
+- `remote-container-logs` / `remote-stop-containers` — Follow logs / stop containers on the target
+
+Remote build and deploy are described in [`apt-config/README.md`](apt-config/README.md).
 
 Example:
 ```bash

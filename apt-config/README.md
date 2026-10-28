@@ -19,3 +19,15 @@ Files:
 - `bhf.conf` — apt/curl netrc credentials for `deb.beckhoff.com` and `deb-mirror.beckhoff.com`
 - `bhf.list` — Beckhoff apt source
 - `debian.sources.list` — Debian mirror sources served by Beckhoff
+- `target.conf` — optional definition of a remote Beckhoff IPC (`TARGET_HOST`, `TARGET_USER`, `TARGET_PORT`, `TARGET_SSH_KEY`, `TARGET_DIR`) used by the remote build/deploy targets (`make build-image-remote`, `make deploy-containers`). Edit it in `apt-config.private` only.
+
+## Remote build and deploy
+
+With `apt-config.private/target.conf` filled in, the image can be built directly on the target, and the sample's compose files deployed to it:
+
+```bash
+make build-image-remote   # DOCKER_HOST=ssh://user@host; credentials are streamed as a build secret, never stored on the target
+make deploy-containers    # copies the compose files to TARGET_DIR/<sample> and runs docker compose up -d
+```
+
+Requirements: SSH access with a key (set `TARGET_SSH_KEY`, or use ssh-agent / a `~/.ssh/config` alias as `TARGET_HOST`), and the target user must be in the `docker` group on the target. Password logins are intentionally not supported; use keys.

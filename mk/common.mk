@@ -5,6 +5,13 @@
 COMMON_MK_DIR := $(dir $(lastword $(MAKEFILE_LIST)))
 REPO_ROOT := $(abspath $(COMMON_MK_DIR)..)
 
+# SAMPLE=<folder> only works through the root Makefile; fail instead of silently using this folder's sample
+ifeq ($(origin SAMPLE),command line)
+ifneq ($(SAMPLE),$(notdir $(CURDIR)))
+$(error SAMPLE=$(SAMPLE) given, but make runs in '$(notdir $(CURDIR))'. Run from the repository root: cd $(REPO_ROOT) && make SAMPLE=$(SAMPLE) <target>)
+endif
+endif
+
 REGISTRY ?=
 IMAGE_OWNER ?=
 IMAGE_NAME ?= $(notdir $(CURDIR))
@@ -37,17 +44,26 @@ TARGET_DIR ?= tc-xar-samples
 REMOTE_DIR = $(TARGET_DIR)/$(notdir $(CURDIR))
 SSH_ID = $(if $(TARGET_SSH_KEY),-i "$(TARGET_SSH_KEY)")
 SSH = ssh -p $(TARGET_PORT) $(SSH_ID) $(TARGET_USER)@$(TARGET_HOST)
-SCP = scp -P $(TARGET_PORT) $(SSH_ID)
+SCP = scp -r -P $(TARGET_PORT) $(SSH_ID)
 REMOTE_DOCKER_HOST = ssh://$(TARGET_USER)@$(TARGET_HOST):$(TARGET_PORT)
-BUILD_CMD = docker build --no-cache --secret id=apt,src=$(APT_AUTH_CONF) --build-context apt-config=$(APT_CONFIG_DIR) $(EXTRA_BUILD_ARGS) --network host -t $(IMAGE) -f $(DOCKERFILE) $(BUILD_CONTEXT)
+BUILD_CMD = docker build --no-cache --label tc-xar-sample=$(IMAGE_NAME) --secret id=apt,src=$(APT_AUTH_CONF) --build-context apt-config=$(APT_CONFIG_DIR) $(EXTRA_BUILD_ARGS) --network host -t $(IMAGE) -f $(DOCKERFILE) $(BUILD_CONTEXT)
+# A rebuild retags the image and leaves the previous one as <none>; remove only dangling images of this sample
+PRUNE_CMD = docker image prune --force --filter "label=tc-xar-sample=$(IMAGE_NAME)"
 # Loads the key into a temporary ssh-agent so the docker CLI's ssh connection can use it
 WITH_KEY = $(if $(TARGET_SSH_KEY),ssh-agent sh -c 'ssh-add "$(TARGET_SSH_KEY)" && $(1)',$(1))
 
 .DEFAULT_GOAL := help
-.PHONY: build-image push-image run-containers restart-containers list-containers stop-and-remove-containers container-logs check-apt-config check-target check-env build-image-remote deploy-containers remote-container-logs remote-stop-containers help
+.PHONY: build-image push-image run-containers restart-containers list-containers stop-and-remove-containers container-logs check-apt-config check-target check-env check-docker-firewall build-image-remote deploy-containers remote-container-logs remote-stop-containers help
 
 check-env:
 	@test -z "$(ENV_FILE)" || test -f "$(ENV_FILE)" || { echo "Missing $(ENV_FILE). Copy it from $(REPO_ROOT)/apt-config/$(notdir $(ENV_FILE)) and edit it."; exit 1; }
+
+# Reloading nftables flushes Docker's iptables chains; warn before `compose up` fails with "No chain/target/match by that name"
+check-docker-firewall:
+	@if command -v iptables >/dev/null 2>&1 && iptables -t nat -nL >/dev/null 2>&1 && ! iptables -t nat -nL DOCKER >/dev/null 2>&1; then \
+		echo "WARNING: Docker's iptables chain 'DOCKER' is missing (nftables was probably reloaded)."; \
+		echo "         Run 'sudo systemctl restart docker' first, otherwise publishing ports will fail."; \
+	fi
 
 check-apt-config:
 	@test -f "$(APT_AUTH_CONF)" || { echo "Missing $(APT_AUTH_CONF). Run: cp -r $(REPO_ROOT)/apt-config $(APT_CONFIG_DIR) and add your myBeckhoff credentials."; exit 1; }
@@ -59,11 +75,22 @@ check-target:
 build-image: check-apt-config
 	@echo "Building Docker image: $(IMAGE)"
 	$(BUILD_CMD)
-
-# Builds on the target: the build context, secret and apt-config are streamed over SSH
+	$(PRUNE_CMD)
+	@echo ""
+	@echo "Image $(IMAGE) built. Running containers keep using the previous image until they are recreated:"
+	@echo "  make restart-containers   (or: make SAMPLE=$(notdir $(CURDIR)) restart-containers from the repository root)"
+	@echo "Old images that are still used by a container are not removed. After restarting, remove leftovers with:"
+	@echo "  docker image prune --force --filter label=tc-xar-sample=$(IMAGE_NAME)"
+	@echo "  (images built before this hint existed have no label: docker images, then docker rmi <ID>)"# Builds on the target: the build context, secret and apt-config are streamed over SSH
 build-image-remote: check-apt-config check-target
 	@echo "Building Docker image $(IMAGE) on $(TARGET_USER)@$(TARGET_HOST)"
 	$(call WITH_KEY,DOCKER_HOST=$(REMOTE_DOCKER_HOST) $(BUILD_CMD))
+	$(call WITH_KEY,DOCKER_HOST=$(REMOTE_DOCKER_HOST) $(PRUNE_CMD))
+	@echo ""
+	@echo "Image $(IMAGE) built on $(TARGET_HOST). Running containers there keep using the previous image until they are recreated:"
+	@echo "  make deploy-containers   (recreates changed containers on the target)"
+	@echo "Old images still used by a container were not removed; after recreating, run this build target again or prune on the target:"
+	@echo "  docker image prune --force --filter label=tc-xar-sample=$(IMAGE_NAME)"
 
 # Copies the compose files to the target and starts the containers there
 deploy-containers: check-target check-env
@@ -84,13 +111,13 @@ push-image:
 	@echo "Pushing Docker image: $(IMAGE)"
 	docker push $(IMAGE)
 
-run-containers: check-env
+run-containers: check-env check-docker-firewall
 	@echo "Starting containers..."
 	$(PRE_UP)
 	$(COMPOSE) up -d
 	$(call POST_UP)
 
-restart-containers: check-env
+restart-containers: check-env check-docker-firewall
 	@echo "Restarting containers..."
 	$(COMPOSE) down
 	$(PRE_UP)

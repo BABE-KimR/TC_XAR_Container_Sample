@@ -6,15 +6,15 @@ Container image and Compose setup for the [TF2000 | TwinCAT 3 HMI Server](https:
 
 The container joins the Docker network `container-network` (192.168.20.0/24) that is shared with the other TwinCAT container samples, so it reaches the other TwinCAT containers locally:
 
-- `tf2000-hmi-server`: 192.168.20.4, AMS Net ID `15.15.15.17.1.1`
-- ADS traffic to the other containers (for example `tc31-xar-base`, AMS Net ID `15.15.15.15.1.1`) goes through the `mosquitto` broker (ADS-over-MQTT, topic `AdsOverMqtt`) via `TwinCAT/StaticRoutes.xml`.
+- `tf2000-hmi-server`: 192.168.20.10, AMS Net ID `15.15.15.10.1.1`
+- ADS traffic to the other containers (for example `tc31-xar-base`, AMS Net ID `15.15.15.3.1.1`) goes through the `mosquitto` broker (ADS-over-MQTT, topic `AdsOverMqtt`) via `TwinCAT/StaticRoutes.xml`.
 
-The sample can be deployed independently of the other samples. It only needs a reachable MQTT broker named `mosquitto` on `container-network`; the [`tc31-xar-base`](../README.md) sample provides one. The network is created automatically if it does not exist yet.
+The sample can be deployed independently of the other samples. It only needs a reachable MQTT broker named `mosquitto` on `container-network`; the [`mosquitto-broker`](../mosquitto-broker/README.md) sample provides one and must be started separately. The network is created automatically if it does not exist yet.
 
 ## Prerequisites
 
 - Beckhoff IPC with Beckhoff RT Linux, Docker and `make` as described in the [main README](../README.md).
-- A running `mosquitto` container on `container-network` (start `tc31-xar-base`, or any broker with that name and network).
+- A running `mosquitto` container on `container-network` (start the [`mosquitto-broker`](../mosquitto-broker/README.md) sample, or any broker with that name and network).
 - A private copy of the apt configuration with your myBeckhoff credentials, see [`apt-config/README.md`](../apt-config/README.md):
 
   ```bash
@@ -65,7 +65,9 @@ sudo systemctl restart docker
 sudo nft list ruleset
 ```
 
-If the `tc31-xar-base` firewall file already declares the `forward` chain with `type filter hook forward ...`, nftables merges rules into the existing chain; keep that declaration in only one of the files if you see a "chain already defined" error.
+The HMI server also needs the rule for traffic inside `container-network` (`ip saddr 192.168.20.0/24 ip daddr 192.168.20.0/24 accept`) to reach the broker; it is part of the firewall file of the [`mosquitto-broker`](../mosquitto-broker/README.md) sample.
+
+If the `mosquitto-broker` firewall file already declares the `forward` chain with `type filter hook forward ...`, nftables merges rules into the existing chain; keep that declaration in only one of the files if you see a "chain already defined" error.
 
 ## 3. Start the container
 
@@ -106,8 +108,8 @@ The HMI server is then available at `https://<ipc-address>:2020`. Use this addre
 - `HMI_INIT_ARGS` in `docker-compose.yaml`: further arguments passed to `TcHmiSrv --initialize` on the first start (when `/var/lib/tchmisrv/service` is empty). Default: `--endpoint=http://127.0.0.1:2010`. Add further parameters from `TcHmiSrv --help`, for example `--name=MyProject`.
 - `HMI_SERVER_CMD` (optional environment variable): overrides the command that starts the HMI server. By default `entrypoint.sh` reads `ExecStart` (and `WorkingDirectory` / `Environment`) from the `TcHmiSrv.service` unit installed by the package.
 - The named volume `hmi-server-data` persists the server instance and deployed projects in `/var/lib/tchmisrv` (server >= 14.5.73). To re-initialize, remove the container and the volume: `sudo docker compose down -v`.
-- The fixed IP `192.168.20.4` must be free on `container-network`; change it in `docker-compose.yaml` if you add other containers.
-- To reach a TwinCAT runtime from the HMI server, address it by its AMS Net ID (for example `15.15.15.15.1.1`) in the server's ADS configuration. The route is provided by the MQTT connection; no extra route entry is needed in this sample.
+- The fixed IP `192.168.20.10` must be free on `container-network`; change it in `docker-compose.yaml` if you add other containers.
+- To reach a TwinCAT runtime from the HMI server, address it by its AMS Net ID (for example `15.15.15.3.1.1`) in the server's ADS configuration. The route is provided by the MQTT connection; no extra route entry is needed in this sample.
 
 ## Useful commands
 

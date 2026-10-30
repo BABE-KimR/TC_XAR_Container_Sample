@@ -1,6 +1,6 @@
 name: tf2000-hmi-server
 
-# Shares container-network with the other TwinCAT containers (tc31-xar-base, mosquitto).
+# Shares container-network with the other TwinCAT containers (tc31-xar-base, mosquitto-broker).
 # The network is created by `make run-containers` / `make deploy-containers` if it does not exist yet.
 networks:
   container-network:
@@ -27,10 +27,10 @@ services:
       - hmi-server-data:/var/lib/tchmisrv
     networks:
       container-network:
-        ipv4_address: 192.168.20.4
+        ipv4_address: 192.168.20.10
     environment:
       # AMS Net ID of this container; must be unique among all TwinCAT containers
-      - AMS_NETID=15.15.15.17.1.1
+      - AMS_NETID=15.15.15.10.1.1
       # Password for `TcHmiSrv --initialize`, read from apt-config.private/hmi.env (see README)
       - HMI_PASSWORD=${HMI_PASSWORD:?set HMI_PASSWORD in apt-config.private/hmi.env}
       # Further arguments for `TcHmiSrv --initialize`, run once on first start (see README)

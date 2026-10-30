@@ -1,0 +1,37 @@
+name: tc31-xar-motion
+
+# Shares container-network with the other TwinCAT containers (mosquitto broker from the mosquitto-broker sample, start it first).
+# The network is created by `make run-containers` / `make deploy-containers` if it does not exist yet.
+networks:
+  container-network:
+    name: container-network
+    external: true
+
+services:
+  tc31-xar-motion:
+    image: tc31-xar-motion:latest
+    container_name: tc31-xar-motion
+    hostname: tc31-xar-motion
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "tcadstool", "127.0.0.1.1.1", "state"]
+      start_period: 5s
+      interval: 10s
+      retries: 3
+    privileged: true
+    volumes:
+      - /dev/hugepages:/dev/hugepages:rw
+    networks:
+      container-network:
+        ipv4_address: 192.168.20.4
+    # Dedicated EtherCAT port: PCI 0000:02:00.0 = LAN3 (bottom left, enp2s0) of the reference
+    # setup (Beckhoff C6030-0080, see ../docs/reference-setup.md). The NIC must be bound to
+    # vfio-pci on the host first (`sudo TcRteInstall -b 0000:02:00.0`), see README.
+    # PCI_DEVICES selects the Ethernet controllers used for real-time ethernet communication
+    # (EtherCAT for the motion axes): NONE for none, or a space separated list of PCI slot
+    # addresses (see `sudo TcRteInstall -l`). It can be overridden from the host, e.g.
+    # `sudo PCI_DEVICES=0000:03:00.0 make SAMPLE=tc31-xar-motion run-containers`.
+    environment:
+      - PCI_DEVICES=${PCI_DEVICES:-0000:02:00.0}
+      # AMS Net ID of this runtime; must be unique among all TwinCAT containers
+      - AMS_NETID=15.15.15.4.1.1

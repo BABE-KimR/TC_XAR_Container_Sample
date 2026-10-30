@@ -1,0 +1,32 @@
+name: mosquitto-broker
+
+# Standalone MQTT broker for ADS-over-MQTT, required by all other samples (they find it as `mosquitto`).
+# It must be started separately with its own compose file; no other sample starts a broker.
+# The network is created by `make run-containers` / `make deploy-containers` if it does not exist yet.
+networks:
+  container-network:
+    name: container-network
+    external: true
+
+services:
+  mosquitto:
+    image: eclipse-mosquitto:latest
+    container_name: mosquitto
+    hostname: mosquitto
+    ports:
+      - "1883:1883"
+      - "8883:8883"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "mosquitto_sub -h localhost -p 1883 -t '$$SYS/broker/version' -C 1 -W 5 >/dev/null 2>&1"]
+      start_period: 5s
+      interval: 10s
+      timeout: 5s
+      retries: 3
+    volumes:
+      - ./simple-mosquitto.conf:/mosquitto/config/mosquitto.conf:ro
+      # TLS certificates and password file for port 8883, not in the repository (see README)
+      - ./secure:/mosquitto/secure:ro
+    networks:
+      container-network:
+        ipv4_address: 192.168.20.2

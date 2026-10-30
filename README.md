@@ -16,8 +16,19 @@ Here’s a high-level overview of what the completed setup will look like:
 
 ---
 
+## **Reference setup**
+
+The hardware and network interface layout used for development is described in [docs/reference-setup.md](docs/reference-setup.md).
+
+Instructions to install a Portainer web UI and to replace containers on the IPC are in [docs/portainer-and-containers.md](docs/portainer-and-containers.md).
+
+---
+
 ## **Other samples**
 
+- [`mosquitto-broker`](mosquitto-broker/README.md) — the Mosquitto MQTT broker for ADS-over-MQTT. **Required by all other samples**, it must be started separately with its own `make` / compose, no other sample starts a broker.
+- [`tc31-xar-motion`](tc31-xar-motion/README.md) — TwinCAT runtime based on the `tc31-xar-base` image with TF5000 NC PTP (motion) installed.
+- [`tc31-xar-motion-nci`](tc31-xar-motion-nci/README.md) — like `tc31-xar-motion`, plus NCI (`twincat-xar-nci-classic`, `twincat-xar-nci-gst`).
 - [`tf2000-hmi-server`](tf2000-hmi-server/README.md) — **NOT WORKING (work in progress):** TwinCAT 3 HMI Server (TF2000) container that shares the container network with the TwinCAT runtime and can be deployed independently.
 
 ---
@@ -92,7 +103,7 @@ During the image build process, TwinCAT for Linux® will be downloaded from `htt
 
 ## **2. Set up firewall rules for MQTT**
 
-On the **Beckhoff IPC running Beckhoff RT Linux that will run Docker**, allow incoming TCP connections to the Mosquitto broker on port `1883` so ADS-over-MQTT can reach the sample.
+On the **Beckhoff IPC running Beckhoff RT Linux that will run Docker**, allow incoming TCP connections to the Mosquitto broker of the [`mosquitto-broker`](mosquitto-broker/README.md) sample so ADS-over-MQTT can reach it: port `1883` (anonymous) **only on the bridge adapter `br200`**. Port `8883` (TLS, user name and password, no anonymous access) on `eno1` and `br200` is not used for ADS-over-MQTT, only for other communication. Port 8883 needs a certificate and a password file, see the sample's README.
 
 Create `/etc/nftables.conf.d/60-mosquitto-container.conf` with the following content:
 
@@ -103,15 +114,22 @@ sudo nano /etc/nftables.conf.d/60-mosquitto-container.conf
 ```nft
 table inet filter {
   chain input {
-    tcp dport 1883 accept
+    iifname "br200" tcp dport 1883 accept
+    iifname { "br200", "eno1" } tcp dport 8883 accept
   }
   chain forward {
     type filter hook forward priority 0; policy drop;
-    tcp sport 1883 accept
-    tcp dport 1883 accept
+    # Traffic between the containers on container-network (runtimes to the broker)
+    ip saddr 192.168.20.0/24 ip daddr 192.168.20.0/24 accept
+    iifname "br200" tcp dport 1883 accept
+    iifname { "br200", "eno1" } tcp dport 8883 accept
+    oifname "br200" tcp sport 1883 accept
+    oifname { "br200", "eno1" } tcp sport 8883 accept
   }
 }
 ```
+
+The rule `ip saddr 192.168.20.0/24 ip daddr 192.168.20.0/24 accept` is **required**: the `forward` chain drops everything else, including the traffic between the containers on `container-network` (for example a TwinCAT runtime connecting to the broker `mosquitto`). Without it the runtimes cannot connect to the broker, even though both containers are healthy and the broker log shows no connection from the runtime. If you change the subnet of `container-network`, adapt the rule.
 
 Save the file by pressing <kbd>Ctrl</kbd>+<kbd>o</kbd> and <kbd>Enter</kbd>.
 Then close the editor via <kbd>Ctrl</kbd>+<kbd>x</kbd> and <kbd>Enter</kbd>.
@@ -128,7 +146,7 @@ Verify the rules were applied:
 sudo nft list ruleset
 ```
 
-You should see rules that reference TCP port `1883` in the output, especially the `tcp dport 1883 accept` rule and the corresponding forward-chain entries.
+You should see rules that reference TCP ports `1883` and `8883` with the interface names `br200` and `eno1` in the output, in the input and forward chains.
 
 Because reloading nftables flushes the Docker-managed firewall rules, restart the Docker service afterwards so Docker can recreate its network rules before you start the sample containers:
 
@@ -136,9 +154,24 @@ Because reloading nftables flushes the Docker-managed firewall rules, restart th
 sudo systemctl restart docker
 ```
 
+**Note:** The input chain of Beckhoff RT Linux drops traffic that is not explicitly allowed. If the IPC also hosts other services that need inbound traffic, for example a libvirt virtual machine that gets its IP address via DHCP from the host's `dnsmasq`, add rules for them to the persistent file in `/etc/nftables.conf.d/`. A rule added manually with `nft insert rule` is lost on the next `systemctl reload nftables`. For a VM on the libvirt bridge `br200`:
+
+```nft
+table inet filter {
+  chain input {
+    # Allow DHCP requests from VMs on the libvirt bridge br200
+    iifname "br200" udp dport 67 accept
+  }
+}
+```
+
+Validate with `sudo nft -c -f /etc/nftables.conf` before reloading. Without such a rule, the VM does not get an address and falls back to an APIPA address (`169.254.x.x`).
+
 ## **3. Start the containers**
 
-The sample includes a `tc31-xar-base/docker-compose.yaml` file to simplify the process of creating a container network and starting the MQTT broker as well as the TwinCAT runtime container.
+The sample includes a `tc31-xar-base/docker-compose.yaml` file to simplify the process of creating a container network and starting the TwinCAT runtime container.
+
+**Required:** the MQTT broker is not started by this sample. Start the [`mosquitto-broker`](mosquitto-broker/README.md) sample first, on this host or on another system (from the repository root: `sudo make SAMPLE=mosquitto-broker run-containers`). The Windows engineering PC and the runtime both connect to this broker, see step 4.
 
 From the repository root directory, start the containers:
 
@@ -159,7 +192,7 @@ sudo docker compose -f tc31-xar-base/docker-compose.yaml ps
 # Or: sudo make list-containers
 ```
 
-You should see both `mosquitto` and `tc31-xar-base` containers with status "Up". Check the logs if any container is not running:
+You should see the `tc31-xar-base` container with status "Up" (and, if the broker runs on this host, `mosquitto` from the `mosquitto-broker` sample). Check the logs if any container is not running:
 
 ```bash
 sudo docker compose -f tc31-xar-base/docker-compose.yaml logs
@@ -189,7 +222,7 @@ To connect your TwinCAT Engineering system (running on Windows) via ADS-over-MQT
 
    d. Restart the **TwinCAT System Service on Windows** (right-click the TwinCAT icon in the system tray → Config).
 
-   e. The containerized TwinCAT runtime should appear as an available target system in TwinCAT Engineering. In the default sample configuration, look for the target that uses AMS Net ID `15.15.15.15.1.1`.
+   e. The containerized TwinCAT runtime should appear as an available target system in TwinCAT Engineering. In the default sample configuration, look for the target that uses AMS Net ID `15.15.15.3.1.1`.
 
 ![](docs/choose-target-system.png)
 
@@ -244,6 +277,31 @@ Real-time Ethernet communication requires the `vfio-pci` driver for a PCI-based 
    ```
 
 **Advanced:** By default, the container will probe all available PCI network devices bound to `vfio-pci`. You can control this behavior by setting the `PCI_DEVICES` environment variable in `tc31-xar-base/docker-compose.yaml`. See the comments above the `environment:` section in that file for details on setting `PCI_DEVICES` to `NONE` or an explicit list of PCI addresses.
+
+### Sharing the host with a TwinCAT runtime on the host
+
+If the TwinCAT runtime (`TcSystemServiceUm`) is also installed on the host, observe the following when containers use real-time Ethernet ports:
+
+- **Exclude the container ports from the host runtime.** A `vfio-pci` port (more precisely its VFIO group) can be opened by only one process. Without restriction the host runtime probes all `vfio-pci` ports at start and the container fails with `EAL: Cannot open /dev/vfio/<n>: Device or resource busy`. Restrict the host runtime to the ports it should use (or `NONE`) with a systemd drop-in, and never list a port that a container uses:
+
+  ```bash
+  sudo mkdir -p /etc/systemd/system/TcSystemServiceUm.service.d
+  sudo tee /etc/systemd/system/TcSystemServiceUm.service.d/override.conf <<'EOF'
+  [Service]
+  Environment=PCI_DEVICES=<PCI device Location of a port for the host, or NONE>
+  EOF
+  sudo systemctl daemon-reload && sudo systemctl restart TcSystemServiceUm
+  ```
+
+  Check with `sudo fuser -v /dev/vfio/<n>` that the group of the container's port is not held by the host. Alternatively disable the host runtime (`sudo systemctl disable --now TcSystemServiceUm`). Likewise give each container its own ports through `PCI_DEVICES` (`NONE` if it needs none), so containers do not claim the same port.
+- **Hugepages are shared.** The containers use the hugepages of the host through the `/dev/hugepages` mount, and the pool is allocated on the host, not in the container. If no runtime allocates it, the container logs `EAL: Cannot get hugepage information.` and TwinCAT reports `Failed to connect to network adapter!`. Check with `grep -i huge /proc/meminfo` (`HugePages_Total` must be above 0) and allocate enough for all runtimes on the host (host runtime and containers), e.g. persistently:
+
+  ```bash
+  echo "vm.nr_hugepages=512" | sudo tee /etc/sysctl.d/90-hugepages.conf
+  sudo sysctl --system
+  ```
+
+See the [reference setup](docs/reference-setup.md) for a worked example.
 
 ---
 

@@ -1,0 +1,238 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1700 1080" width="1700" height="1080" font-family="Segoe UI, Arial, sans-serif" font-size="11">
+  <title>Proof of concept overview: Beckhoff C6030 with RT Linux host, containers and Windows 11 VM</title>
+  <rect width="1700" height="1080" fill="#ffffff"/>
+  <text x="20" y="28" font-size="20" font-weight="bold">Reference setup – proof of concept overview</text>
+
+  <!-- External: programmer laptop (OEM) -->
+  <rect x="100" y="50" width="200" height="70" rx="4" fill="#fde0e0" stroke="#c0392b" stroke-width="2"/>
+  <rect x="80" y="120" width="240" height="10" rx="3" fill="#fde0e0" stroke="#c0392b" stroke-width="2"/>
+  <text x="200" y="76" text-anchor="middle" font-weight="bold" font-size="13">Programmer laptop (OEM)</text>
+  <text x="200" y="94" text-anchor="middle">TwinCAT XAE, maintenance</text>
+  <text x="200" y="108" text-anchor="middle">Secure ADS 8016/tcp to host runtime</text>
+
+  <!-- External: company network / cloud -->
+  <ellipse cx="1300" cy="85" rx="130" ry="48" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="1300" y="82" text-anchor="middle" font-weight="bold" font-size="13">Company network / cloud</text>
+  <text x="1300" y="98" text-anchor="middle">maintained by corporate IT</text>
+
+  <!-- Cables to the controller -->
+  <line x1="200" y1="130" x2="200" y2="210" stroke="#c0392b" stroke-width="4"/>
+  <line x1="1300" y1="133" x2="1300" y2="210" stroke="#2e8b3e" stroke-width="4"/>
+  <text x="215" y="160" font-weight="bold">LAN1 · eno1 · 0000:00:1f.6 · e1000e</text>
+  <text x="215" y="175">host OS only, not bound to vfio-pci</text>
+  <text x="215" y="190">secure only: 8016/tcp · 48899/udp · 2020 · 8883 (TLS)</text>
+  <text x="215" y="205">disconnect when not used</text>
+  <text x="1315" y="160" font-weight="bold">LAN2 · enp1s0 · 0000:01:00.0 · vfio-pci</text>
+  <text x="1315" y="175">passed through to the Windows 11 VM</text>
+  <text x="1315" y="190">company network, if allowed</text>
+
+  <!-- Controller -->
+  <rect x="30" y="225" width="1640" height="640" rx="8" fill="#f4f4f4" stroke="#444" stroke-width="3"/>
+  <text x="260" y="244" font-weight="bold" font-size="13">Beckhoff C6030-0080 IPC · Intel Core i5 (11th gen) · 2 × 8 GB · Beckhoff RT Linux</text>
+
+  <!-- Controller ports -->
+  <rect x="160" y="210" width="80" height="30" fill="#fde0e0" stroke="#c0392b" stroke-width="2"/>
+  <text x="200" y="230" text-anchor="middle" font-weight="bold">LAN1</text>
+  <rect x="1260" y="210" width="80" height="30" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="1300" y="230" text-anchor="middle" font-weight="bold">LAN2</text>
+  <rect x="30" y="850" width="80" height="30" fill="#fde0e0" stroke="#c0392b" stroke-width="2"/>
+  <text x="70" y="870" text-anchor="middle" font-weight="bold">LAN4</text>
+  <rect x="512" y="850" width="80" height="30" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="552" y="870" text-anchor="middle" font-weight="bold">LAN3</text>
+
+  <!-- Host OS (OEM) -->
+  <rect x="90" y="255" width="740" height="545" rx="6" fill="#fdeeee" stroke="#c0392b" stroke-width="2"/>
+  <text x="500" y="275" font-weight="bold" font-size="13" fill="#8e1b10">HOST OS (OEM access) – Beckhoff RT Linux</text>
+
+  <rect x="100" y="310" width="220" height="130" rx="4" fill="#fde0e0" stroke="#c0392b" stroke-width="2"/>
+  <text x="110" y="328" font-weight="bold">TwinCAT runtime (host)</text>
+  <text x="110" y="346">TcSystemServiceUm</text>
+  <text x="110" y="362">PCI_DEVICES=0000:03:00.0</text>
+  <text x="110" y="378">(systemd drop-in, LAN4 only)</text>
+  <text x="110" y="394">Secure ADS 8016/tcp</text>
+  <text x="110" y="410">48899/udp broadcast discovery</text>
+  <text x="110" y="426">ADS-over-MQTT via 8883 (optional)</text>
+
+  <rect x="335" y="310" width="220" height="130" rx="4" fill="#fde0e0" stroke="#c0392b" stroke-width="2"/>
+  <text x="345" y="328" font-weight="bold">nftables firewall</text>
+  <text x="345" y="346">forward: 192.168.20.0/24 ↔</text>
+  <text x="345" y="362">192.168.20.0/24 accept</text>
+  <text x="345" y="378">input br200 only: 1883, 2010, 9443</text>
+  <text x="345" y="394">input br200 + eno1: 8883 (TLS)</text>
+  <text x="345" y="410">udp 67 DHCP: br200</text>
+
+  <rect x="570" y="310" width="240" height="130" rx="4" fill="#fde0e0" stroke="#c0392b" stroke-width="2"/>
+  <text x="580" y="328" font-weight="bold">TF2000 HMI server (host)</text>
+  <text x="580" y="346">2020/tcp HTTPS (eno1, secure)</text>
+  <text x="580" y="362">2010/tcp HTTP (br200 only)</text>
+  <text x="580" y="378">for the CNC HMI application</text>
+  <text x="580" y="394">future: websocket only, no ADS</text>
+
+  <!-- eno1 services -->
+  <line x1="200" y1="240" x2="200" y2="310" stroke="#c0392b" stroke-width="3"/>
+  <polyline points="200,292 690,292 690,310" fill="none" stroke="#c0392b" stroke-width="3"/>
+
+  <!-- Docker -->
+  <rect x="100" y="450" width="720" height="330" rx="6" fill="#ffffff" stroke="#c0392b" stroke-width="2" stroke-dasharray="6 3"/>
+  <text x="110" y="468" font-weight="bold">Docker (host) – container-network 192.168.20.0/24 (external)</text>
+  <rect x="110" y="478" width="700" height="26" rx="3" fill="#fde0e0" stroke="#c0392b" stroke-width="1.5"/>
+  <text x="460" y="496" text-anchor="middle">/dev/hugepages – allocated on the host (vm.nr_hugepages=512), shared by host runtime and containers</text>
+
+  <rect x="110" y="525" width="165" height="165" rx="4" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="120" y="543" font-weight="bold">mosquitto</text>
+  <text x="120" y="560">192.168.20.2</text>
+  <text x="120" y="576">1883 anonymous (br200)</text>
+  <text x="120" y="592">8883 TLS (br200, eno1)</text>
+  <text x="120" y="608">ADS-over-MQTT broker,</text>
+  <text x="120" y="624">topic AdsOverMqtt</text>
+
+  <rect x="290" y="525" width="165" height="165" rx="4" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="300" y="543" font-weight="bold">tc31-xar-base</text>
+  <text x="300" y="560">192.168.20.3</text>
+  <text x="300" y="576">AMS 15.15.15.3.1.1</text>
+  <text x="300" y="592">PCI_DEVICES=NONE</text>
+  <text x="300" y="608">privileged, hugepages</text>
+
+  <rect x="470" y="525" width="165" height="165" rx="4" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="480" y="543" font-weight="bold">tc31-xar-motion</text>
+  <text x="480" y="560">192.168.20.4</text>
+  <text x="480" y="576">AMS 15.15.15.4.1.1</text>
+  <text x="480" y="592">PCI_DEVICES=0000:02:00.0</text>
+  <text x="480" y="608">(LAN3, EtherCAT master)</text>
+  <text x="480" y="624">privileged, hugepages</text>
+
+  <rect x="650" y="525" width="160" height="165" rx="4" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="660" y="543" font-weight="bold">Portainer</text>
+  <text x="660" y="560">proof of concept, unused</text>
+  <text x="660" y="576">9443/tcp HTTPS</text>
+  <text x="660" y="592">br200 only,</text>
+  <text x="660" y="608">not exposed on eno1</text>
+
+  <line x1="190" y1="705" x2="730" y2="705" stroke="#777" stroke-width="2" stroke-dasharray="5 3"/>
+  <line x1="192" y1="690" x2="192" y2="705" stroke="#777" stroke-width="2"/>
+  <line x1="372" y1="690" x2="372" y2="705" stroke="#777" stroke-width="2"/>
+  <line x1="552" y1="690" x2="552" y2="705" stroke="#777" stroke-width="2"/>
+  <line x1="730" y1="690" x2="730" y2="705" stroke="#777" stroke-width="2"/>
+  <text x="110" y="725" fill="#555">container-network: runtimes reach the broker "mosquitto" (192.168.20.2:1883)</text>
+  <text x="110" y="741" fill="#555">ADS-over-MQTT routes: StaticRoutes.xml, broker host mosquitto, topic AdsOverMqtt</text>
+
+  <!-- Internal links to the EtherCAT ports -->
+  <polyline points="100,420 70,420 70,850" fill="none" stroke="#c0392b" stroke-width="4"/>
+  <line x1="552" y1="705" x2="552" y2="850" stroke="#2e8b3e" stroke-width="4"/>
+
+  <!-- Stubs host -> bridge -> VM -->
+  <g stroke="#e67e00" stroke-width="3">
+    <line x1="810" y1="370" x2="990" y2="370"/>
+    <line x1="830" y1="417" x2="990" y2="417"/>
+    <line x1="820" y1="560" x2="990" y2="560"/>
+    <line x1="820" y1="600" x2="990" y2="600"/>
+    <line x1="820" y1="640" x2="990" y2="640"/>
+  </g>
+
+  <!-- Bridge br200 (OEM <-> end user) -->
+  <rect x="850" y="255" width="120" height="545" rx="6" fill="#ffe6c7" stroke="#e67e00" stroke-width="3"/>
+  <text x="910" y="278" text-anchor="middle" font-weight="bold" font-size="13">br200</text>
+  <text x="910" y="294" text-anchor="middle">libvirt bridge</text>
+  <text x="910" y="310" text-anchor="middle">10.0.200.1/24</text>
+  <text x="910" y="326" text-anchor="middle">dnsmasq DHCP</text>
+
+  <rect x="858" y="353" width="104" height="34" rx="4" fill="#ffffff" stroke="#e67e00" stroke-width="1.5"/>
+  <text x="910" y="368" text-anchor="middle" font-weight="bold">2010/tcp</text>
+  <text x="910" y="381" text-anchor="middle">HMI server HTTP</text>
+  <rect x="858" y="400" width="104" height="34" rx="4" fill="#ffffff" stroke="#e67e00" stroke-width="1.5"/>
+  <text x="910" y="415" text-anchor="middle" font-weight="bold">udp 67</text>
+  <text x="910" y="428" text-anchor="middle">DHCP (VM)</text>
+  <rect x="858" y="543" width="104" height="34" rx="4" fill="#ffffff" stroke="#e67e00" stroke-width="1.5"/>
+  <text x="910" y="558" text-anchor="middle" font-weight="bold">1883/tcp</text>
+  <text x="910" y="571" text-anchor="middle">MQTT anonymous</text>
+  <rect x="858" y="583" width="104" height="34" rx="4" fill="#ffffff" stroke="#e67e00" stroke-width="1.5"/>
+  <text x="910" y="598" text-anchor="middle" font-weight="bold">9443/tcp</text>
+  <text x="910" y="611" text-anchor="middle">Portainer HTTPS</text>
+  <rect x="858" y="623" width="104" height="34" rx="4" fill="#ffffff" stroke="#e67e00" stroke-width="1.5"/>
+  <text x="910" y="638" text-anchor="middle" font-weight="bold">8883/tcp</text>
+  <text x="910" y="651" text-anchor="middle">MQTT TLS</text>
+  <text x="910" y="700" text-anchor="middle" fill="#8a4b00">unencrypted ports</text>
+  <text x="910" y="714" text-anchor="middle" fill="#8a4b00">only on br200,</text>
+  <text x="910" y="728" text-anchor="middle" fill="#8a4b00">never on eno1</text>
+
+  <!-- Windows 11 VM (end user) -->
+  <rect x="990" y="255" width="660" height="545" rx="6" fill="#eef9ee" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="1000" y="275" font-weight="bold" font-size="13" fill="#1d5c28">Windows 11 VM (end user access) – 10.0.200.10 (DHCP from br200)</text>
+  <line x1="1300" y1="240" x2="1300" y2="255" stroke="#2e8b3e" stroke-width="4"/>
+
+  <rect x="1020" y="295" width="600" height="62" rx="4" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="1030" y="313" font-weight="bold">TwinCAT XAE Shell (development tools)</text>
+  <text x="1030" y="330">containers: ADS-over-MQTT via broker 10.0.200.1:1883</text>
+  <text x="1030" y="346">host runtime: Secure ADS 8016/tcp (or ADS-over-MQTT via 8883)</text>
+
+  <rect x="1020" y="372" width="600" height="62" rx="4" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="1030" y="390" font-weight="bold">HMI interface to the runtimes in the containers</text>
+  <text x="1030" y="407">Portainer https://10.0.200.1:9443 (proof of concept, unused)</text>
+
+  <rect x="1020" y="449" width="600" height="78" rx="4" fill="#ffe6c7" stroke="#e67e00" stroke-width="2" stroke-dasharray="6 3"/>
+  <text x="1030" y="467" font-weight="bold">CNC HMI application (bridge to the host runtime)</text>
+  <text x="1030" y="484">today: standard ADS, will also use ADS-over-MQTT to the host runtime</text>
+  <text x="1030" y="500">exposes the host runtime to the end user – to be avoided</text>
+  <text x="1030" y="516">future: via TF2000 HMI server (2010/2020), websocket only, no ADS</text>
+
+  <rect x="1020" y="542" width="600" height="62" rx="4" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="1030" y="560" font-weight="bold">NIC passthrough: LAN2 · enp1s0 · 0000:01:00.0 · vfio-pci</text>
+  <text x="1030" y="577">isolated interface, company network if allowed, corporate IT maintains the VM</text>
+  <text x="1030" y="593">the user only has access to this VM and its tools, not to the host OS</text>
+
+  <circle cx="1060" cy="650" r="14" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <path d="M1035 700 q0 -34 25 -34 q25 0 25 34 z" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="1110" y="656" font-weight="bold" font-size="13">End user</text>
+  <text x="1110" y="674">works only in the Windows 11 VM</text>
+  <text x="1110" y="690">reaches containers and the HMI via br200</text>
+
+  <!-- EtherCAT network 1: host runtime on LAN4 -->
+  <text x="80" y="900" font-weight="bold">enp3s0 · 0000:03:00.0</text>
+  <text x="80" y="914">vfio-pci → host runtime</text>
+  <line x1="70" y1="880" x2="70" y2="970" stroke="#c0392b" stroke-width="4"/>
+  <line x1="70" y1="970" x2="440" y2="970" stroke="#c0392b" stroke-width="4"/>
+  <g fill="#fde0e0" stroke="#c0392b" stroke-width="2" text-anchor="middle">
+    <rect x="90" y="940" width="80" height="60" rx="3"/><rect x="180" y="940" width="80" height="60" rx="3"/>
+    <rect x="270" y="940" width="80" height="60" rx="3"/><rect x="360" y="940" width="80" height="60" rx="3"/>
+  </g>
+  <g text-anchor="middle" font-size="10">
+    <text x="130" y="967" font-weight="bold">EK1100</text><text x="130" y="981">coupler</text>
+    <text x="220" y="967" font-weight="bold">EL1008</text><text x="220" y="981">8× DI</text>
+    <text x="310" y="967" font-weight="bold">EL2008</text><text x="310" y="981">8× DO</text>
+    <text x="400" y="967" font-weight="bold">EL3004</text><text x="400" y="981">4× AI</text>
+  </g>
+  <text x="70" y="1030" font-weight="bold">EtherCAT network 1 (dummy IO) – host runtime</text>
+
+  <!-- EtherCAT network 2: container on LAN3 -->
+  <text x="562" y="900" font-weight="bold">enp2s0 · 0000:02:00.0</text>
+  <text x="562" y="914">vfio-pci → tc31-xar-motion</text>
+  <line x1="552" y1="880" x2="552" y2="970" stroke="#2e8b3e" stroke-width="4"/>
+  <line x1="552" y1="970" x2="920" y2="970" stroke="#2e8b3e" stroke-width="4"/>
+  <g fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2">
+    <rect x="570" y="940" width="80" height="60" rx="3"/><rect x="660" y="940" width="80" height="60" rx="3"/>
+    <rect x="750" y="940" width="80" height="60" rx="3"/><rect x="840" y="940" width="80" height="60" rx="3"/>
+  </g>
+  <g text-anchor="middle" font-size="10">
+    <text x="610" y="967" font-weight="bold">EK1100</text><text x="610" y="981">coupler</text>
+    <text x="700" y="967" font-weight="bold">EL1008</text><text x="700" y="981">8× DI</text>
+    <text x="790" y="967" font-weight="bold">EL2008</text><text x="790" y="981">8× DO</text>
+    <text x="880" y="967" font-weight="bold">Servo drive</text><text x="880" y="981">(motion)</text>
+  </g>
+  <text x="552" y="1030" font-weight="bold">EtherCAT network 2 (dummy IO) – container tc31-xar-motion</text>
+
+  <!-- Legend -->
+  <rect x="1000" y="890" width="650" height="170" rx="6" fill="#ffffff" stroke="#999" stroke-width="1.5"/>
+  <text x="1015" y="912" font-weight="bold" font-size="13">Legend</text>
+  <rect x="1015" y="922" width="22" height="14" fill="#fde0e0" stroke="#c0392b" stroke-width="2"/>
+  <text x="1045" y="934">Host system, OEM access</text>
+  <rect x="1215" y="922" width="22" height="14" fill="#e0f5e0" stroke="#2e8b3e" stroke-width="2"/>
+  <text x="1245" y="934">End-user exposed environment</text>
+  <rect x="1445" y="922" width="22" height="14" fill="#ffe6c7" stroke="#e67e00" stroke-width="2"/>
+  <text x="1475" y="934">Bridge OEM ↔ end user</text>
+  <text x="1015" y="962">• Only one TwinCAT runtime per NIC: every port belongs to exactly one consumer (host, VM or one container).</text>
+  <text x="1015" y="978">• Host runtime and containers share the hugepages allocated on the host.</text>
+  <text x="1015" y="994">• eno1 accepts secure protocols only; 1883, 2010 and 9443 are accepted on br200 only.</text>
+  <text x="1015" y="1010">• Forward rule 192.168.20.0/24 → 192.168.20.0/24 is required for container-to-broker traffic.</text>
+  <text x="1015" y="1026">• Programming: containers via ADS-over-MQTT (1883), host runtime via Secure ADS (8016).</text>
+  <text x="1015" y="1042">• Other setups can vary; this is the current proof of concept.</text>
+</svg>
